@@ -59,6 +59,7 @@ def extract():
         return {"error": 'invalid urls format'}
     
     format_type = body.get('format_type', 'markdown')
+    prompt = body.get('prompt', None)
 
     ocr_processor = OCRProcessor(
         model_name="llama3.2-vision:11b",
@@ -71,6 +72,7 @@ def extract():
         results = ocr_processor.process_batch(
             input_path=urls,
             format_type=format_type,
+            custom_prompt=prompt,
             preprocess=True,
             language="en",
         )
