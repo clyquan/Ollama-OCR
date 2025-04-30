@@ -3,7 +3,6 @@ import json
 from dotenv import load_dotenv
 
 from bottle import Bottle, run, request, response, abort
-from image_processor import ImageProcessor
 from ocr_processor import OCRProcessor
 from typing import Dict, Any, List, Union
 
@@ -48,37 +47,19 @@ def extract():
     """
     urls = request.json
 
-    processor = ImageProcessor(max_workers=4, timeout=15)
-    image_paths = processor.process_urls(urls)
-
     ocr_processor = OCRProcessor(
         model_name="llama3.2-vision:11b",
         base_url=BASE_URL,
         api_key=API_KEY,
-        max_workers=4
+        max_workers=4,
     )
-    results = process_batch_images(
-        ocr_processor, image_paths.values(), "markdown", True, None, "en"
-    )
-    return results
 
-
-def process_batch_images(
-    processor: OCRProcessor,
-    image_paths,
-    format_type: str,
-    enable_preprocessing: bool,
-    custom_prompt: str,
-    language: str,
-):
-    """Process multiple images and return results"""
     try:
-        results = processor.process_batch(
-            input_path=image_paths,
-            format_type=format_type,
-            preprocess=enable_preprocessing,
-            custom_prompt=custom_prompt,
-            language=language,
+        results = ocr_processor.process_batch(
+            input_path=urls,
+            format_type="markdown",
+            preprocess=True,
+            language="en",
         )
         return results
     except Exception as e:

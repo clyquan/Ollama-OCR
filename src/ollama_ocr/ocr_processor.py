@@ -9,6 +9,9 @@ from pathlib import Path
 import cv2
 import pymupdf 
 import numpy as np
+import tempfile
+import mimetypes
+import urllib.parse
 
 class OCRProcessor:
     def __init__(self, model_name: str = "llama3.2-vision:11b", 
@@ -24,7 +27,37 @@ class OCRProcessor:
             self.api_headers = None
         else:
             self.api_headers = {"Authorization": f"Bearer {api_key}"}
-        
+     
+    def _is_url(self, path: str) -> bool:
+        """Check if the path is a URL"""
+        return path.startswith('http://') or path.startswith('https://')   
+    
+    def _download_file(self, url: str, timeout: int = 30) -> str:
+        """Download file from URL to temporary location"""
+        try:
+            response = requests.get(url, timeout=timeout)
+            response.raise_for_status()
+            
+            # Determine file extension
+            content_type = response.headers.get('Content-Type', '')
+            parsed_url = urllib.parse.urlparse(url)
+            path_ext = os.path.splitext(parsed_url.path)[1]
+            
+            # Get extension priority: Content-Type -> URL path -> default
+            if 'application/pdf' in content_type:
+                ext = '.pdf'
+            elif 'image/' in content_type:
+                ext = mimetypes.guess_extension(content_type) or path_ext or '.jpg'
+            else:
+                ext = path_ext or '.bin'
+
+            # Create temp file with appropriate extension
+            with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as temp_file:
+                temp_file.write(response.content)
+                return temp_file.name
+                
+        except Exception as e:
+            raise ValueError(f"Failed to download {url}: {str(e)}")
 
     def _encode_image(self, image_path: str) -> str:
         """Convert image to base64 string"""
@@ -104,16 +137,31 @@ class OCRProcessor:
             custom_prompt: If provided, this prompt overrides the default based on format_type
             language: Language code to apply language specific OCR preprocessing
         """
+        
+        temp_files_to_cleanup = []
+        
         try:
+            if self._is_url(image_path):
+                local_path = self._download_file(image_path)
+                temp_files_to_cleanup.append(local_path)
+                print(f"Downloaded remote file to: {local_path}")
+            else:
+                local_path = image_path
+             
+            if not os.path.exists(local_path):
+                raise ValueError(f"File not found: {local_path}")
+               
             # If the input is a PDF, process all pages
-            if image_path.lower().endswith('.pdf'):
-                image_pages = self._pdf_to_images(image_path)
+            if local_path.lower().endswith('.pdf'):
+                image_pages = self._pdf_to_images(local_path)
+                temp_files_to_cleanup.extend(image_pages)
                 print("No. of pages in the PDF", len(image_pages))
                 responses = []
                 for idx, page_file in enumerate(image_pages):
                     # Process each page with preprocessing if enabled
                     if preprocess:
                         preprocessed_path = self._preprocess_image(page_file, language)
+                        temp_files_to_cleanup.append(preprocessed_path)
                     else:
                         preprocessed_path = page_file
 
@@ -208,13 +256,13 @@ class OCRProcessor:
 
             # Process non-PDF images as before.
             if preprocess:
-                image_path = self._preprocess_image(image_path, language)
+                preprocessed_path = self._preprocess_image(local_path, language)
+                temp_files_to_cleanup.append(preprocessed_path)
+                image_path_to_process = preprocessed_path
+            else:
+                image_path_to_process = local_path
 
-            image_base64 = self._encode_image(image_path)
-
-            # Clean up temporary files
-            if image_path.endswith(('_preprocessed.jpg', '_temp.jpg')):
-                os.remove(image_path)
+            image_base64 = self._encode_image(image_path_to_process)
 
             if custom_prompt and custom_prompt.strip():
                 prompt = custom_prompt
@@ -292,6 +340,13 @@ class OCRProcessor:
             return result
         except Exception as e:
             return f"Error processing image: {str(e)}"
+        finally:
+            for file_path in temp_files_to_cleanup:
+                try:
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                except Exception as e:
+                    print(f"Error cleaning up temporary file {file_path}: {e}")
 
     def process_batch(
         self,
@@ -319,15 +374,34 @@ class OCRProcessor:
         # Collect all image paths
         image_paths = []
         if isinstance(input_path, str):
-            base_path = Path(input_path)
-            if base_path.is_dir():
-                pattern = '**/*' if recursive else '*'
-                for ext in ['.png', '.jpg', '.jpeg', '.pdf', '.tiff']:
-                    image_paths.extend(base_path.glob(f'{pattern}{ext}'))
+            if self._is_url(input_path):
+                image_paths.append(input_path)
             else:
-                image_paths = [base_path]
+                base_path = Path(input_path)
+                if base_path.is_dir():
+                    pattern = '**/*' if recursive else '*'
+                    for ext in ['.png', '.jpg', '.jpeg', '.pdf', '.tiff']:
+                        image_paths.extend([
+                            str(p) for p in base_path.glob(f'{pattern}{ext}') 
+                            if p.is_file()
+                        ])
+                elif base_path.exists():
+                    image_paths.append(str(base_path))
         else:
-            image_paths = [Path(p) for p in input_path]
+            for path in input_path:
+                if self._is_url(path):
+                    image_paths.append(path)
+                else:
+                    base_path = Path(path)
+                    if base_path.is_dir():
+                        pattern = '**/*' if recursive else '*'
+                        for ext in ['.png', '.jpg', '.jpeg', '.pdf', '.tiff']:
+                            image_paths.extend([
+                                str(p) for p in base_path.glob(f'{pattern}{ext}') 
+                                if p.is_file()
+                            ])
+                    elif base_path.exists():
+                        image_paths.append(str(base_path))    
 
         results = {}
         errors = {}
