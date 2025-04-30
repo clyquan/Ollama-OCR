@@ -52,9 +52,10 @@ def extract():
     image_paths = processor.process_urls(urls)
 
     ocr_processor = OCRProcessor(
-        model_name="llama3.2-vision:latest",
+        model_name="llama3.2-vision:11b",
         base_url=BASE_URL,
         api_key=API_KEY,
+        max_workers=4
     )
     results = process_batch_images(
         ocr_processor, image_paths.values(), "markdown", True, None, "en"

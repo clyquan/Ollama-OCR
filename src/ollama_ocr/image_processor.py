@@ -1,5 +1,4 @@
 import requests
-import logging
 import tempfile
 import os
 import re
@@ -10,14 +9,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Tuple
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("image_processor.log"), logging.StreamHandler()],
-)
-logger = logging.getLogger(__name__)
 
 
 class ImageProcessor:
@@ -41,7 +32,7 @@ class ImageProcessor:
 
         # 创建临时目录
         self.temp_dir = tempfile.TemporaryDirectory(prefix="imgproc_")
-        logger.info(f"创建临时目录：{self.temp_dir.name}")
+        print(f"创建临时目录：{self.temp_dir.name}")
 
         # 安全配置
         self.safe_chars = set("-.()_%s%s" % (string.ascii_letters, string.digits))
@@ -92,7 +83,7 @@ class ImageProcessor:
     def __exit__(self, exc_type, exc_val, exc_tb):
         if not self.keep_temp:
             self.temp_dir.cleanup()
-            logger.info("已清理临时目录")
+            print("已清理临时目录")
 
     def _sanitize_filename(self, filename: str) -> str:
         """深度清理文件名"""
@@ -177,16 +168,16 @@ class ImageProcessor:
                         if len(content) >= self.max_sig_length:
                             mime, _ = self._detect_mime_type(content)
                             if not mime:
-                                logger.warning(f"无效的文件签名：{url}")
+                                print(f"无效的文件签名：{url}")
                                 return None
                 # 最终验证
                 mime, ext = self._detect_mime_type(content)
                 if not mime:
-                    logger.warning(f"无法识别的文件类型：{url}")
+                    print(f"无法识别的文件类型：{url}")
                     return None
                 return bytes(content), ext
         except requests.RequestException as e:
-            logger.error(f"请求失败 [{url}]: {str(e)}")
+            print(f"请求失败 [{url}]: {str(e)}")
             return None
 
     def process_urls(self, urls: List[str]) -> Dict[str, str]:
@@ -210,9 +201,9 @@ class ImageProcessor:
                             with open(filepath, "wb") as f:
                                 f.write(content)
                             results[url] = filepath
-                            logger.info(f"成功保存：{url} → {filepath}")
+                            print(f"成功保存：{url} → {filepath}")
                         except IOError as e:
-                            logger.error(f"文件写入失败 [{url}]: {str(e)}")
+                            print(f"文件写入失败 [{url}]: {str(e)}")
                 except Exception as e:
-                    logger.error(f"处理异常 [{url}]: {str(e)}")
+                    print(f"处理异常 [{url}]: {str(e)}")
         return results

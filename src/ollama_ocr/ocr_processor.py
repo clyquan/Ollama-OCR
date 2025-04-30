@@ -20,7 +20,7 @@ class OCRProcessor:
         self.base_url = base_url
         self.max_workers = max_workers
         
-        if api_key is None:
+        if api_key is None or len(api_key) == 0:
             self.api_headers = None
         else:
             self.api_headers = {"Authorization": f"Bearer {api_key}"}
