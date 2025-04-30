@@ -8,3 +8,5 @@ opencv-python
 pdf2image
 numpy
 pymupdf
+bottle
+dotenv

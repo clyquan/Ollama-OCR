@@ -1,9 +1,18 @@
 import streamlit as st
 from ocr_processor import OCRProcessor
 import tempfile
+
 import os
+from dotenv import load_dotenv
+
 from PIL import Image
 import json
+
+load_dotenv(".env")
+
+# Example valid tokens
+BASE_URL = os.getenv("OLLAMA_BASE_URL")
+API_KEY = os.getenv("API_KEY")
 
 # Page configuration
 st.set_page_config(
@@ -154,7 +163,7 @@ def main():
     custom_prompt = custom_prompt_input if custom_prompt_input.strip() != "" else None
 
     # Initialize OCR Processor
-    processor = OCRProcessor(model_name=selected_model, max_workers=max_workers)
+    processor = OCRProcessor(model_name=selected_model, max_workers=max_workers, base_url=BASE_URL, api_key=API_KEY)
 
     # Main content area with tabs
     tab1, tab2 = st.tabs(["📸 File Processing", "ℹ️ About"])

@@ -13,11 +13,18 @@ import numpy as np
 class OCRProcessor:
     def __init__(self, model_name: str = "llama3.2-vision:11b", 
                  base_url: str = "http://localhost:11434/api/generate",
+                 api_key: str = None,
                  max_workers: int = 1):
         
         self.model_name = model_name
         self.base_url = base_url
         self.max_workers = max_workers
+        
+        if api_key is None:
+            self.api_headers = None
+        else:
+            self.api_headers = {"Authorization": f"Bearer {api_key}"}
+        
 
     def _encode_image(self, image_path: str) -> str:
         """Convert image to base64 string"""
@@ -177,7 +184,7 @@ class OCRProcessor:
                     }
 
                     # Make the API call to Ollama
-                    response = requests.post(self.base_url, json=payload)
+                    response = requests.post(self.base_url, json=payload, headers=self.api_headers)
                     response.raise_for_status()
                     res = response.json().get("response", "")
                     print("Page No. Processed", idx)
@@ -270,7 +277,7 @@ class OCRProcessor:
                 "images": [image_base64]
             }
 
-            response = requests.post(self.base_url, json=payload)
+            response = requests.post(self.base_url, json=payload, headers=self.api_headers)
             response.raise_for_status()
 
             result = response.json().get("response", "")
