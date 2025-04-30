@@ -45,7 +45,18 @@ def extract():
     """
     Extract text from an image using OCR.
     """
-    urls = request.json
+    body = request.json
+    urls = body.get('urls')
+    
+    if urls is None:
+        return {"error": 'no urls provided'}
+    
+    if isinstance(urls, str):
+        urls = urls.strip().split(',')
+    elif isinstance(urls, list):
+        urls = [url.strip() for url in urls]
+    else:   
+        return {"error": 'invalid urls format'}
 
     ocr_processor = OCRProcessor(
         model_name="llama3.2-vision:11b",
