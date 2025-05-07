@@ -100,7 +100,7 @@ def fetch_asin():
         "formats": ["json"],
         "jsonOptions": {
             "schema": {},
-            "prompt": "extract the product information, such as: page title, product name, sold by, currency, price, asin.",
+            "prompt": "extract the product information, such as: product name, sold by, asin, image_url(i.e.:the URL of the first main image of the product).",
         },
     }
 
@@ -109,6 +109,7 @@ def fetch_asin():
         "Content-Type": "application/json",
     }
 
+    print(f"Requesting Firecrawl API for: {asin}")
     try:
         resp = requests.post(
             "https://api.firecrawl.dev/v1/scrape",
@@ -119,6 +120,8 @@ def fetch_asin():
         resp.raise_for_status()
     except requests.RequestException as e:
         return {"error": f"Request to Firecrawl API failed: {str(e)}"}
+
+    print(f"Response from Firecrawl API for: {asin}")
 
     result = resp.json()
     if result.get("success") is not True:
